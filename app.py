@@ -7,6 +7,11 @@ import re
 import threading
 import time
 from functools import wraps
+from captcha.image import ImageCaptcha
+import random
+import string
+import io
+from flask import send_file
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -28,8 +33,50 @@ def login_required(f):
     return decorated_function
 
 # =====================================================
+# ФУНКЦИИ ДЛЯ КАПЧИ
+# =====================================================
+
+def generate_captcha_text():
+    """Генерирует случайный текст для капчи"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+def generate_captcha():
+    """Генерирует изображение капчи"""
+    # Генерируем случайный текст
+    captcha_text = generate_captcha_text()
+    
+    # Сохраняем текст в сессии для проверки
+    session['captcha_text'] = captcha_text
+    session['captcha_time'] = datetime.now().timestamp()
+    
+    # Создаём изображение капчи (исправленный параметр)
+    image = ImageCaptcha(width=300, height=100, font_sizes=[42])
+    
+    # Генерируем изображение
+    data = image.generate(captcha_text)
+    
+    return data
+
+# =====================================================
 # МАРШРУТЫ АВТОРИЗАЦИИ
 # =====================================================
+
+@app.route('/captcha-image')
+def captcha_image():
+    """Возвращает изображение капчи"""
+    try:
+        data = generate_captcha()
+        return send_file(
+            io.BytesIO(data.getvalue()),
+            mimetype='image/png'
+        )
+    except Exception as e:
+        print(f"Ошибка генерации капчи: {e}")
+        # Если ошибка, возвращаем простую капчу
+        return send_file(
+            io.BytesIO(b''),
+            mimetype='image/png'
+        )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -40,17 +87,43 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
+        captcha_input = request.form.get('captcha', '').strip().upper()
         
+        # Проверяем капчу
+        captcha_text = session.get('captcha_text')
+        captcha_time = session.get('captcha_time', 0)
+        
+        # Проверяем, не истекло ли время капчи (5 минут)
+        if datetime.now().timestamp() - captcha_time > 300:
+            flash('Время действия капчи истекло. Попробуйте снова.', 'danger')
+            return redirect(url_for('login'))
+        
+        if not captcha_text or captcha_input != captcha_text:
+            flash('Неверный код с картинки!', 'danger')
+            return redirect(url_for('login'))
+        
+        # Проверяем логин и пароль
         if username == app.config['ADMIN_USERNAME'] and password == app.config['ADMIN_PASSWORD']:
             session['logged_in'] = True
             session['username'] = username
             session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # Очищаем капчу из сессии
+            session.pop('captcha_text', None)
             flash(f'Добро пожаловать, {username}!', 'success')
             return redirect(url_for('index'))
         else:
             flash('Неверный логин или пароль!', 'danger')
     
+    # Генерируем новую капчу при загрузке страницы
+    generate_captcha()
+    
     return render_template('login.html')
+
+@app.route('/refresh-captcha')
+def refresh_captcha():
+    """Обновляет капчу"""
+    generate_captcha()
+    return '', 204
 
 @app.route('/logout')
 def logout():

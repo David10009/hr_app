@@ -22,7 +22,7 @@
         
         .login-container {
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             padding: 20px;
         }
         
@@ -81,6 +81,41 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
+        .captcha-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 5px;
+        }
+        
+        .captcha-image {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        .captcha-image img {
+            width: 100%;
+            height: 60px;
+            object-fit: cover;
+        }
+        
+        .refresh-captcha {
+            padding: 8px 15px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+        
+        .refresh-captcha:hover {
+            background: #e0e0e0;
+        }
+        
         .btn-login {
             width: 100%;
             padding: 12px;
@@ -123,6 +158,12 @@
             color: #b7950b;
         }
         
+        .alert-info {
+            background: #eaf2f8;
+            border-left: 4px solid #3498db;
+            color: #1b4f72;
+        }
+        
         .login-footer {
             text-align: center;
             padding: 20px;
@@ -145,6 +186,13 @@
             padding: 2px 6px;
             border-radius: 4px;
             font-family: monospace;
+        }
+        
+        .info-text {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+            text-align: center;
         }
     </style>
 </head>
@@ -176,14 +224,22 @@
                         <input type="password" name="password" placeholder="Введите ваш пароль" required>
                     </div>
                     
+                    <div class="form-group">
+                        <label>🖼️ Код с картинки</label>
+                        <div class="captcha-container">
+                            <div class="captcha-image" onclick="refreshCaptcha()">
+                                <img src="{{ url_for('captcha_image') }}" alt="CAPTCHA" id="captcha-img">
+                            </div>
+                            <button type="button" class="refresh-captcha" onclick="refreshCaptcha()" title="Обновить код">
+                                🔄
+                            </button>
+                        </div>
+                        <input type="text" name="captcha" placeholder="Введите код с картинки" required style="margin-top: 10px;">
+                        <div class="info-text">Кликните на картинку для обновления кода</div>
+                    </div>
+                    
                     <button type="submit" class="btn-login">🚀 Войти в систему</button>
                 </form>
-                
-                <div class="demo-credentials">
-                    <strong>ℹ️ Тестовые данные для входа:</strong><br>
-                    Логин: <code>admin</code><br>
-                    Пароль: <code>admin123</code>
-                </div>
             </div>
             
             <div class="login-footer">
@@ -191,5 +247,23 @@
             </div>
         </div>
     </div>
+    
+    <script>
+        function refreshCaptcha() {
+            // Добавляем параметр времени, чтобы избежать кэширования
+            const img = document.getElementById('captcha-img');
+            const timestamp = new Date().getTime();
+            img.src = "{{ url_for('captcha_image') }}?t=" + timestamp;
+            
+            // Очищаем поле ввода капчи
+            const captchaInput = document.querySelector('input[name="captcha"]');
+            if (captchaInput) {
+                captchaInput.value = '';
+            }
+        }
+        
+        // Обновляем капчу каждые 5 минут (300 секунд)
+        setInterval(refreshCaptcha, 300000);
+    </script>
 </body>
 </html>
