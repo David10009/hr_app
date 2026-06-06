@@ -8,3 +8,5 @@ python3 init_db.py
 
 # запуск 
 python3 app.py
+
+йоу
